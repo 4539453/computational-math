@@ -16,6 +16,9 @@ jupyterlab = "*"
 sklearn = "*"
 jedi = "*"
 statsmodels = "*"
+seaborn = "*"
+joblib = "*"
+neovim = "*"
 
 [dev-packages]
 
