@@ -19,13 +19,36 @@ class RidgeRegression(LinearRegression):
             raise TypeError("alpha must be a number")
         self.__alpha = alpha
 
-    def fit(self, X: np.ndarray, y: np.ndarray) -> "RidgeRegression":
-        """Fit ridge regression model."""
-        validate_data(X, y)
-        # without intercept
-        X = self.transform(X)[:, 1:]
-        w_hat = np.linalg.inv(X.T @ X + self.alpha * np.eye(X.shape[1])) @ X.T @ y
+    def fit(self, x: np.ndarray, y: np.ndarray) -> "RidgeRegression":
+        validate_data(x, y)
+        # data without intercept
+        X = self.transform(x)[:, 1:]
+        _, n_ivs = X.shape
+        w_hat = np.linalg.inv(X.T @ X + self.alpha * np.eye(n_ivs)) @ X.T @ y
         intercept = np.mean(y)
         self._w_hat = np.insert(w_hat, 0, intercept, axis=0)
-        self._set_n_ivs(X)
         return self
+
+
+class SVDRidgeRegression(RidgeRegression):
+    def fit(self, x: np.ndarray, y: np.ndarray) -> "RidgeRegression":
+        validate_data(x, y)
+        # data without intercept
+        X = self.transform(x)[:, 1:]
+        # `V` is V.T in the SVD decomposition
+        U, s, V = np.linalg.svd(X, full_matrices=False)
+        _, n_ivs = X.shape
+        w_hat = V.T @ np.linalg.inv(np.diag(s**2) + self.alpha * np.eye(n_ivs)) @ np.diag(s) @ U.T @ y
+        intercept = np.mean(y)
+        self._w_hat = np.insert(w_hat, 0, intercept, axis=0)
+        return self
+
+    def fit_predict(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        validate_data(x, y)
+        # data without intercept
+        X = self.transform(x)[:, 1:]
+        U, s, V = np.linalg.svd(X, full_matrices=False)
+        _, n_ivs = X.shape
+        y_hat = U @ np.diag(s) @ np.linalg.inv(np.diag(s**2) + self.alpha * np.eye(n_ivs)) @ np.diag(s) @ U.T @ y
+        y_hat = y_hat + np.mean(y)
+        return y_hat

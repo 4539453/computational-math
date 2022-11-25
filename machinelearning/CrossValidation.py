@@ -8,7 +8,7 @@ from machinelearning.utils import validate_data
 
 
 def kfold_cross_validation(
-    bs: Bootstrap, x: np.ndarray, y: np.ndarray, f=None, n_splits=10
+    bs: Bootstrap, x: np.ndarray, y: np.ndarray, f=None, w_true=None, n_splits=10
 ) -> dict:
     """Simple implementation of KFold CV directly for Bootstrap class."""
     validate_data(x, y)
@@ -24,6 +24,8 @@ def kfold_cross_validation(
         "test_bias_y_hat": np.zeros(n_splits),
         "test_var_y_hat": np.zeros(n_splits),
         "test_cond_num": np.zeros(n_splits),
+        "test_bs_w_hat_bias": np.zeros(n_splits),
+        "test_bs_w_hat_var": np.zeros(n_splits),
         "train_r2": np.zeros(n_splits),
         "train_adj_r2": np.zeros(n_splits),
         "train_mse": np.zeros(n_splits),
@@ -47,6 +49,8 @@ def kfold_cross_validation(
         scores["test_bias_y_hat"][i] = bs.square_bias_score(x_test, f)
         scores["test_var_y_hat"][i] = bs.y_hat_variance_score(x_test)
         scores["test_cond_num"][i] = np.linalg.cond(estimator.transform(x_train))
+        scores["test_bs_w_hat_bias"][i] = bs.get_w_hat_squared_bias(w_true)
+        scores["test_bs_w_hat_var"][i] = bs.get_w_hat_var()
 
         scores["train_r2"][i] = estimator.score(x_train, y_train)
         scores["train_adj_r2"][i] = estimator.adj_r2_score(x_train, y_train)

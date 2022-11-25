@@ -11,18 +11,14 @@ class LinearRegression(RegressorMixin):
 
     Attributes
     ----------
-    __transformer : sklearn.preprocessing._data.PolynomialFeatures
+    _transformer : sklearn.preprocessing._data.PolynomialFeatures
 
-    __w_hat : np.ndarray
-
-    __n_ivs : int
-        Number of independent variables.
+    _w_hat : np.ndarray
     """
 
     def __init__(self, transformer=None):
         self._set_transformer(transformer)
         self._w_hat = None
-        self._n_ivs = None
 
     @property
     def w_hat(self):
@@ -30,24 +26,10 @@ class LinearRegression(RegressorMixin):
             raise ValueError("Model is not fitted yet")
         return self._w_hat
 
-    @property
-    def n_ivs(self):
-        if self._n_ivs is None:
-            raise ValueError("Model is not fitted yet")
-        return self._n_ivs
-
-    def _set_n_ivs(self, x: np.ndarray):
-        if self._transformer is None:
-            self._n_ivs = int(x.shape[1])
-        else:
-            # FIXME: do we count the intercept?
-            self._n_ivs = int(self._transformer.n_output_features_) - 1
-            # assert self.__n_ivs == self.__transformer.degree
-
     def _set_transformer(self, obj):
         if obj is None:
-            pass
-        if not isinstance(obj, PolynomialFeatures):
+            obj = PolynomialFeatures(degree=1, include_bias=True)
+        elif not isinstance(obj, PolynomialFeatures):
             wrong_transformer_type_message = (
                 "\nTransformer should be instance of PolynomialFeatures"
                 f"your transformer is {type(obj)}"
@@ -55,20 +37,17 @@ class LinearRegression(RegressorMixin):
             raise TypeError(wrong_transformer_type_message)
         self._transformer = obj
 
+    def get_n_ivs(self) -> int:
+        return int(self._transformer.n_output_features_) - 1
+
     def transform(self, x):
-        if self._transformer is None:
-            pass
-        else:
-            x = self._transformer.fit_transform(x)
-        return x
+        return self._transformer.fit_transform(x)
 
     def fit(self, x: np.ndarray, y: np.ndarray):
         validate_data(x, y)
         x = self.transform(x)
         self._w_hat = np.linalg.pinv(x) @ y
 
-        # FIXME: maybe not good idea put it here
-        self._set_n_ivs(x)
         return self
 
     def predict(self, x: np.ndarray):
@@ -86,7 +65,9 @@ class LinearRegression(RegressorMixin):
     def adj_r2_score(self, x: np.ndarray, y: np.ndarray):
         validate_data(x, y)
         r2 = self.score(x, y)
-        adj_r2 = 1 - (1 - r2) * (y.shape[0] - 1) / (y.shape[0] - self.n_ivs - 1)
+        n_samples, _ = y.shape
+        n_ivs = self.get_n_ivs()
+        adj_r2 = 1 - (1 - r2) * (n_samples - 1) / (n_samples - n_ivs - 1)
 
         return adj_r2
 

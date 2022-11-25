@@ -47,7 +47,7 @@ class Bootstrap:
         estimator = copy(self.estimator)
         self.__estimator_w_hat = estimator.fit(x, y).w_hat
         self.__sampler.fit(x, y)
-        self.__w_hats = np.zeros((estimator.n_ivs + 1, self.__n_bootstraps))
+        self.__w_hats = np.zeros((estimator.get_n_ivs() + 1, self.__n_bootstraps))
 
         for i in range(self.__n_bootstraps):
             # bootstrap sample
@@ -106,11 +106,35 @@ class Bootstrap:
     def get_w_hat_std(self):
         return np.std(self.w_hats, axis=1)
 
+    def get_w_hat_var(self) -> np.float64:
+        return np.mean(np.var(self.w_hats, axis=1), axis=0)
+
     def get_w_hat_ci(self, alpha: float = 0.05):
         return np.quantile(self.w_hats, [alpha / 2, 1 - alpha / 2], axis=1)
 
     def get_w_hat_bias(self):
         return np.mean(self.w_hats, axis=1) - self.estimator_w_hat
+
+    def get_w_hat_squared_bias(self, w_true=None) -> np.float64:
+        if w_true is None:
+            w_true = self.estimator_w_hat.flatten()
+        else:
+            w_true = w_true.flatten()
+
+        mean_w_hat = np.mean(self.w_hats, axis=1)
+        mean_w_hat, w_true = self.__align_dimensions_with_zeros(mean_w_hat, w_true)
+        return np.mean(
+                (mean_w_hat - w_true) ** 2, axis=0
+        )
+
+    @staticmethod
+    def __align_dimensions_with_zeros(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        zeros = np.zeros(abs(len(a) - len(b)))
+        if len(a) > len(b):
+            b = np.concatenate((b, zeros))
+        elif len(a) < len(b):
+            a = np.concatenate((a, zeros))
+        return a, b
 
     def get_w_hat_bias_std(self):
         return np.std(self.w_hats, axis=1)
@@ -120,9 +144,6 @@ class Bootstrap:
             np.quantile(self.w_hats, [alpha / 2, 1 - alpha / 2], axis=1)
             - self.estimator_w_hat
         )
-
-    def get_w_hat_mse(self):
-        return np.mean((self.w_hats - self.estimator_w_hat) ** 2, axis=1)
 
     def get_w_hat_mse_std(self):
         return np.std((self.w_hats - self.estimator_w_hat) ** 2, axis=1)

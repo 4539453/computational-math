@@ -20,10 +20,9 @@ class LassoRegression(LinearRegression):
             raise TypeError("alpha must be a number")
         self.__alpha = alpha
 
-    def fit(self, X: np.ndarray, y: np.ndarray) -> "LassoRegression":
-        validate_data(X, y)
-        X = self.transform(X)
+    def fit(self, x: np.ndarray, y: np.ndarray) -> "LassoRegression":
+        validate_data(x, y)
+        X = self.transform(x)
         self._w_hat = Lasso(alpha=self.alpha).fit(X, y).coef_.reshape((-1, 1))
 
-        self._set_n_ivs(X)
         return self
