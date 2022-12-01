@@ -1,21 +1,11 @@
 # %%
-from collections.abc import Callable, Iterator
-from copy import copy
-from itertools import cycle
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-# from scipy.stats import alpha
-import seaborn as sns
-import statsmodels.api as sm
-from pandas.plotting import PlotAccessor
-from sklearn.base import BaseEstimator, RegressorMixin
-from sklearn.metrics import r2_score
-from sklearn.model_selection import KFold, train_test_split
-from sklearn.pipeline import Pipeline
+from matplotlib.ticker import MaxNLocator
+# import seaborn as sns
+# import statsmodels.api as sm
 from sklearn.preprocessing import PolynomialFeatures
-from sklearn.utils import resample
 
 from machinelearning.Bootstrap import Bootstrap
 from machinelearning.CrossValidation import kfold_cross_validation
@@ -61,64 +51,72 @@ w_true = np.array([0.0, 1.0, -2.0, 0.5]).reshape((-1, 1))
 # %%
 def plot(
     cv_scores: dict[str, np.ndarray],
-    degrees: range,
+    model_params: range | np.ndarray,
     x,
     y,
     y_hats,
     title: str = "Regression",
 ):
-    gridsize = (3, 2)
-    fig = plt.figure(figsize=(12, 12))
-    ax1 = plt.subplot2grid(gridsize, (0, 0), colspan=2, rowspan=2)
-    ax2 = plt.subplot2grid(gridsize, (2, 0))
-    ax3 = plt.subplot2grid(gridsize, (2, 1))
-    # fig, ((ax1), (ax2, ax3)) = plt.subplots(nrows=2, ncols=2, figsize=(10, 12))
-    # plot (x, y) data
-    ax1.scatter(x, y, s=15, c="black", marker="o", label="data")
-
     def plot_y_hats(ax, y_hats, degrees):
         """Plot fitted polynomials."""
         for i, degree in enumerate(degrees):
             data: np.ndarray = np.concatenate([x, y_hats[i].reshape((-1, 1))], axis=1)
             data = data[np.argsort(data[:, 0], axis=0), :]
-            ax.plot(data[:, 0], data[:, 1], label=f"degree {degree}")
+            ax.plot(data[:, 0], data[:, 1], label=f"model param {degree}")
 
         ax.legend(loc="upper left", prop={"size": 10})
         ax.set_title("Fitted data")
         ax.set_xlabel("x")
         ax.set_ylabel("y")
 
-    plot_y_hats(ax1, y_hats, degrees)
-
-    def plot_f_hat_bias_variance_tradeoff(ax, cv_scores, degrees):
-        labels = ["bias_y_hat", "var_y_hat", "bs_mse"]
+    def plot_bias_variance_tradeoff(
+        ax,
+        cv_scores: dict[str, np.ndarray],
+        labels: list[str],
+        model_params: np.ndarray,
+        title: str = "Bias-variance tradeoff",
+    ):
         labels = [f"test_{lb}" for lb in labels]
-        scores = np.array([cv_scores[lb] for lb in labels])
-        normalized_scores = scores / scores.max()
+        scores: np.ndarray = np.array([cv_scores[lb] for lb in labels])
+        normalized_scores: np.ndarray = (scores / scores.max() * 100).astype("int8")
         for i, lb in enumerate(labels):
-            ax.plot(degrees, normalized_scores[i], "-o", label=lb)
+            ax.plot(range(len(model_params)), normalized_scores[i], "-o", label=lb)
 
-        ax.legend(loc="upper right", prop={"size": 10})
-        ax.set_title("f_hat bias-variance tradeoff")
-        ax.set_xlabel("degrees")
+        ax.set_xticks(
+            range(len(model_params)), model_params.round(decimals=2), rotation=15.0
+        )
+        ax.set_xlabel("model param")
         ax.set_ylabel("percents(%)")
 
-    plot_f_hat_bias_variance_tradeoff(ax2, cv_scores, degrees)
-
-    def plot_w_hat_bias_variance_tradeoff(ax, cv_scores, degrees):
-        labels = ["w_hat_bias", "w_hat_var"]
-        labels = [f"test_bs_{lb}" for lb in labels]
-        scores = np.array([cv_scores[lb] for lb in labels])
-        normalized_scores = scores / scores.max()
-        for i, lb in enumerate(labels):
-            ax.plot(degrees, normalized_scores[i], "-o", label=lb)
-
         ax.legend(loc="upper right", prop={"size": 10})
-        ax.set_title("w_hat bias-variance tradeoff")
-        ax.set_xlabel("degrees")
-        ax.set_ylabel("percents(%)")
+        ax.set_title(title)
 
-    plot_w_hat_bias_variance_tradeoff(ax3, cv_scores, degrees)
+    gridsize = (3, 2)
+    fig = plt.figure(figsize=(12, 12))
+    ax1 = plt.subplot2grid(gridsize, (0, 0), colspan=2, rowspan=2)
+    ax2 = plt.subplot2grid(gridsize, (2, 0))
+    ax3 = plt.subplot2grid(gridsize, (2, 1))
+    # fig, ((ax1), (ax2, ax3)) = plt.subplots(nrows=2, ncols=2, figsize=(10, 12))
+
+    # plot (x, y) data
+    ax1.scatter(x, y, s=15, c="black", marker="o", label="data")
+
+    model_params = np.array(model_params)
+    plot_y_hats(ax1, y_hats, model_params)
+    plot_bias_variance_tradeoff(
+        ax2,
+        cv_scores,
+        ["bias_y_hat", "var_y_hat", "bs_mse"],
+        model_params,
+        title="f_hat bias-variance tradeoff",
+    )
+    plot_bias_variance_tradeoff(
+        ax3,
+        cv_scores,
+        ["bs_w_hat_bias", "bs_w_hat_var"],
+        model_params,
+        title="w_hat bias-variance tradeoff",
+    )
 
     plt.suptitle(title)
     plt.tight_layout()
@@ -126,8 +124,6 @@ def plot(
 
 
 # %%
-# degrees = [1, 2, 10]
-# degrees = range(1, 11)
 degrees = range(2, 7)
 pf = PolynomialFeatures()
 estimator = LinearRegression(transformer=pf)
@@ -158,11 +154,9 @@ pd.DataFrame(cv_scores, index=degrees)
 plot(cv_scores, degrees, x, y, y_hats, title="Polynomial regression")
 
 # %%
-# degrees = [1, 2, 10]
-# degrees = range(1, 11)
-degrees = range(2, 7)
-pf = PolynomialFeatures()
-estimator = RidgeRegression(transformer=pf, alpha=10e3)
+alphas = np.insert(np.logspace(0, 3, 5), 0, 0.0)
+pf = PolynomialFeatures(degree=3)
+estimator = RidgeRegression(transformer=pf)
 bs_sampler = Sampler(type="cheating", f=f)
 bs = Bootstrap(estimator, bs_sampler, n_bootstraps=100)
 n_cv_splits = 4
@@ -170,9 +164,9 @@ n_cv_splits = 4
 
 cv_scores: dict[str, np.ndarray] = {}
 y_hats: list[np.ndarray] = []
-for i, degree in enumerate(degrees):
-    # set degree of polynomial features
-    pf.degree = degree
+for i, alpha in enumerate(alphas):
+    # set estimator's alpha
+    estimator.alpha = alpha
     # calculate cv scores
     score = kfold_cross_validation(bs, x, y, f, w_true, n_cv_splits)
     # estimate w_hat on all data
@@ -180,18 +174,15 @@ for i, degree in enumerate(degrees):
     # fill cv_scores dict
     for k, v in score.items():
         if k not in cv_scores.keys():
-            cv_scores[k] = np.zeros(len(degrees))
+            cv_scores[k] = np.zeros(len(alphas))
         cv_scores[k][i] = v
 
-# print(pd.DataFrame(cv_scores.values(), index=list(cv_scores.keys()), columns=degrees))
-pd.DataFrame(cv_scores, index=degrees)
+pd.DataFrame(cv_scores, index=alphas)
 
 # %%
-plot(cv_scores, degrees, x, y, y_hats, title="Polynomial ridge regression")
+plot(cv_scores, alphas, x, y, y_hats, title="Polynomial ridge regression")
 
 # %%
-# degrees = [1, 2, 10]
-# degrees = range(1, 11)
 degrees = range(2, 7)
 pf = PolynomialFeatures()
 estimator = SVDRidgeRegression(transformer=pf, alpha=10e3)
@@ -215,7 +206,6 @@ for i, degree in enumerate(degrees):
             cv_scores[k] = np.zeros(len(degrees))
         cv_scores[k][i] = v
 
-# print(pd.DataFrame(cv_scores.values(), index=list(cv_scores.keys()), columns=degrees))
 pd.DataFrame(cv_scores, index=degrees)
 
 # %%
@@ -223,8 +213,6 @@ plot(cv_scores, degrees, x, y, y_hats, title="SVD Ridge regression")
 
 
 # %%
-# degrees = [1, 2, 10]
-# degrees = range(1, 11)
 degrees = range(2, 7)
 pf = PolynomialFeatures()
 estimator = LassoRegression(transformer=pf, alpha=10e3)
@@ -248,8 +236,36 @@ for i, degree in enumerate(degrees):
             cv_scores[k] = np.zeros(len(degrees))
         cv_scores[k][i] = v
 
-# print(pd.DataFrame(cv_scores.values(), index=list(cv_scores.keys()), columns=degrees))
 pd.DataFrame(cv_scores, index=degrees)
 
 # %%
 plot(cv_scores, degrees, x, y, y_hats, title="Polynomial lasso regression")
+
+# %%
+alphas = np.insert(np.logspace(0, 3, 5), 0, 0.0)
+pf = PolynomialFeatures(degree=3)
+estimator = LassoRegression(transformer=pf)
+bs_sampler = Sampler(type="cheating", f=f)
+bs = Bootstrap(estimator, bs_sampler, n_bootstraps=100)
+n_cv_splits = 4
+
+
+cv_scores: dict[str, np.ndarray] = {}
+y_hats: list[np.ndarray] = []
+for i, alpha in enumerate(alphas):
+    # set estimator's alpha
+    estimator.alpha = alpha
+    # calculate cv scores
+    score = kfold_cross_validation(bs, x, y, f, w_true, n_cv_splits)
+    # estimate w_hat on all data
+    y_hats.append(estimator.fit(x, y).predict(x).flatten())
+    # fill cv_scores dict
+    for k, v in score.items():
+        if k not in cv_scores.keys():
+            cv_scores[k] = np.zeros(len(alphas))
+        cv_scores[k][i] = v
+
+pd.DataFrame(cv_scores, index=alphas)
+
+# %%
+plot(cv_scores, range(len(alphas)), x, y, y_hats, title="Polynomial lasso regression")

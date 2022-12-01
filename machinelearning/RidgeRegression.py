@@ -21,34 +21,67 @@ class RidgeRegression(LinearRegression):
 
     def fit(self, x: np.ndarray, y: np.ndarray) -> "RidgeRegression":
         validate_data(x, y)
-        # data without intercept
-        X = self.transform(x)[:, 1:]
-        _, n_ivs = X.shape
-        w_hat = np.linalg.inv(X.T @ X + self.alpha * np.eye(n_ivs)) @ X.T @ y
-        intercept = np.mean(y)
-        self._w_hat = np.insert(w_hat, 0, intercept, axis=0)
+
+        # TODO: Why so bad estimation with centered intersept?
+        # # data without intercept
+        # X = self.transform(x)[:, 1:]
+        # _, n_ivs = X.shape
+        # w_hat = np.linalg.inv(X.T @ X + self.alpha * np.eye(n_ivs)) @ X.T @ y
+        # intercept = np.mean(y)
+        # self._w_hat = np.insert(w_hat, 0, intercept, axis=0)
+
+        X = self.transform(x)
+        _, n_features = X.shape
+        self._w_hat = np.linalg.inv(X.T @ X + self.alpha * np.eye(n_features)) @ X.T @ y
         return self
 
 
 class SVDRidgeRegression(RidgeRegression):
     def fit(self, x: np.ndarray, y: np.ndarray) -> "RidgeRegression":
         validate_data(x, y)
-        # data without intercept
-        X = self.transform(x)[:, 1:]
-        # `V` is V.T in the SVD decomposition
+
+        # TODO: --//--
+        # # data without intercept
+        # X = self.transform(x)[:, 1:]
+        # _, n_ivs = X.shape
+        # # `V` is V.T in the SVD decomposition
+        # U, s, V = np.linalg.svd(X, full_matrices=False)
+        # w_hat = V.T @ np.linalg.inv(np.diag(s**2) + self.alpha * np.eye(n_ivs)) @ np.diag(s) @ U.T @ y
+        # intercept = np.mean(y)
+        # self._w_hat = np.insert(w_hat, 0, intercept, axis=0)
+
+        X = self.transform(x)
+        _, n_features = X.shape
         U, s, V = np.linalg.svd(X, full_matrices=False)
-        _, n_ivs = X.shape
-        w_hat = V.T @ np.linalg.inv(np.diag(s**2) + self.alpha * np.eye(n_ivs)) @ np.diag(s) @ U.T @ y
-        intercept = np.mean(y)
-        self._w_hat = np.insert(w_hat, 0, intercept, axis=0)
+        self._w_hat = (
+            V.T
+            @ np.linalg.inv(np.diag(s**2) + self.alpha * np.eye(n_features))
+            @ np.diag(s)
+            @ U.T
+            @ y
+        )
         return self
 
     def fit_predict(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         validate_data(x, y)
-        # data without intercept
-        X = self.transform(x)[:, 1:]
+
+        # TODO: --//--
+        # # data without intercept
+        # X = self.transform(x)[:, 1:]
+        # U, s, V = np.linalg.svd(X, full_matrices=False)
+        # _, n_ivs = X.shape
+        # y_hat = U @ np.diag(s) @ np.linalg.inv(np.diag(s**2) + self.alpha * np.eye(n_ivs)) @ np.diag(s) @ U.T @ y
+        # y_hat = y_hat + np.mean(y)
+
+        X = self.transform(x)
+        _, n_features = X.shape
         U, s, V = np.linalg.svd(X, full_matrices=False)
-        _, n_ivs = X.shape
-        y_hat = U @ np.diag(s) @ np.linalg.inv(np.diag(s**2) + self.alpha * np.eye(n_ivs)) @ np.diag(s) @ U.T @ y
-        y_hat = y_hat + np.mean(y)
+        y_hat = (
+            U
+            @ np.diag(s)
+            @ np.linalg.inv(np.diag(s**2) + self.alpha * np.eye(n_features))
+            @ np.diag(s)
+            @ U.T
+            @ y
+        )
         return y_hat
